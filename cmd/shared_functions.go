@@ -5,13 +5,18 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/daveshanley/vacuum/model"
 	"github.com/daveshanley/vacuum/plugin"
 	"github.com/daveshanley/vacuum/rulesets"
 	"github.com/dustin/go-humanize"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pterm/pterm"
-	"time"
 )
 
 // BuildRuleSetFromUserSuppliedSet creates a ready to run ruleset, augmented or provided by a user
@@ -117,4 +122,56 @@ func CheckFailureSeverity(failSeverityFlag string, errors int, warnings int, inf
 		}
 	}
 	return nil
+}
+
+func LoadFile(file, authorizationHeader string) ([]byte, error) {
+	if strings.HasPrefix(file, "http") {
+		c := NewAuthenticatedClient(authorizationHeader)
+		resp, err := c.Get(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read remote spec file %s: %v", file, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to read remote spec file %s, unexpected status code: %d", file, resp.StatusCode)
+		}
+
+		fileBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read remote spec file %s: %v", file, err)
+		}
+
+		return fileBytes, nil
+	}
+
+	// read file from filesystem
+	fileBytes, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read local spec file %s: %v", file, err)
+	}
+
+	return fileBytes, nil
+}
+
+func NewAuthenticatedClient(authorizationHeader string) *http.Client {
+	return &http.Client{
+		Timeout: time.Second * 120,
+		Transport: &addHeaderTransport{
+			T:          http.DefaultTransport,
+			authHeader: authorizationHeader,
+		},
+	}
+}
+
+type addHeaderTransport struct {
+	T          http.RoundTripper
+	authHeader string
+}
+
+func (adt *addHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if adt.authHeader != "" {
+		req.Header.Add("Authorization", adt.authHeader)
+	}
+	return adt.T.RoundTrip(req)
 }

@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/daveshanley/vacuum/model"
 	"github.com/daveshanley/vacuum/motor"
 	"github.com/daveshanley/vacuum/rulesets"
@@ -16,8 +19,6 @@ import (
 	vacuum_report "github.com/daveshanley/vacuum/vacuum-report"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
-	"time"
 )
 
 func GetVacuumReportCommand() *cobra.Command {
@@ -42,6 +43,7 @@ func GetVacuumReportCommand() *cobra.Command {
 			stdOut, _ := cmd.Flags().GetBool("stdout")
 			noStyleFlag, _ := cmd.Flags().GetBool("no-style")
 			baseFlag, _ := cmd.Flags().GetString("base")
+			authHeaderFlag, _ := cmd.Flags().GetString("auth-header")
 			junitFlag, _ := cmd.Flags().GetBool("junit")
 			skipCheckFlag, _ := cmd.Flags().GetBool("skip-check")
 			timeoutFlag, _ := cmd.Flags().GetInt("timeout")
@@ -92,8 +94,7 @@ func GetVacuumReportCommand() *cobra.Command {
 				specBytes = buf.Bytes()
 
 			} else {
-				// read file from filesystem
-				specBytes, fileError = os.ReadFile(args[0])
+				specBytes, fileError = LoadFile(args[0], authHeaderFlag)
 			}
 
 			if fileError != nil {
