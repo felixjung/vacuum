@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/daveshanley/vacuum/model"
 	"github.com/daveshanley/vacuum/motor"
 	"github.com/daveshanley/vacuum/rulesets"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
-	"time"
 )
 
 func GetSpectralReportCommand() *cobra.Command {
@@ -43,6 +44,7 @@ func GetSpectralReportCommand() *cobra.Command {
 			stdOut, _ := cmd.Flags().GetBool("stdout")
 			noStyleFlag, _ := cmd.Flags().GetBool("no-style")
 			baseFlag, _ := cmd.Flags().GetString("base")
+			authHeaderFlag, _ := cmd.Flags().GetString("auth-header")
 			skipCheckFlag, _ := cmd.Flags().GetBool("skip-check")
 			timeoutFlag, _ := cmd.Flags().GetInt("timeout")
 			hardModeFlag, _ := cmd.Flags().GetBool("hard-mode")
@@ -151,13 +153,14 @@ func GetSpectralReportCommand() *cobra.Command {
 			}
 
 			ruleset := motor.ApplyRulesToRuleSet(&motor.RuleSetExecution{
-				RuleSet:           selectedRS,
-				Spec:              specBytes,
-				CustomFunctions:   customFunctions,
-				SilenceLogs:       true,
-				Base:              baseFlag,
-				SkipDocumentCheck: skipCheckFlag,
-				Timeout:           time.Duration(timeoutFlag) * time.Second,
+				RuleSet:             selectedRS,
+				Spec:                specBytes,
+				CustomFunctions:     customFunctions,
+				SilenceLogs:         true,
+				Base:                baseFlag,
+				AuthorizationHeader: authHeaderFlag,
+				SkipDocumentCheck:   skipCheckFlag,
+				Timeout:             time.Duration(timeoutFlag) * time.Second,
 			})
 
 			resultSet := model.NewRuleResultSet(ruleset.Results)

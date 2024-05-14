@@ -11,8 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"path"
+	"strings"
 
+	"github.com/daveshanley/vacuum/remote"
 	"github.com/pb33f/libopenapi/bundler"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pterm/pterm"
@@ -41,6 +45,8 @@ func GetBundleCommand() *cobra.Command {
 			noStyleFlag, _ := cmd.Flags().GetBool("no-style")
 			baseFlag, _ := cmd.Flags().GetString("base")
 			remoteFlag, _ := cmd.Flags().GetBool("remote")
+			authHeaderFlag, _ := cmd.Flags().GetString("auth-header")
+			debugFlag, _ := cmd.Flags().GetBool("debug")
 
 			// disable color and styling, for CI/CD use.
 			// https://github.com/daveshanley/vacuum/issues/234
@@ -83,8 +89,7 @@ func GetBundleCommand() *cobra.Command {
 				specBytes = buf.Bytes()
 
 			} else {
-				// read file from filesystem
-				specBytes, fileError = os.ReadFile(args[0])
+				specBytes, fileError = LoadFile(args[0], authHeaderFlag)
 			}
 
 			if fileError != nil {
@@ -92,15 +97,17 @@ func GetBundleCommand() *cobra.Command {
 				pterm.Println()
 				return fileError
 			}
-			if baseFlag == "" {
-				baseFlag = "."
-			}
 
 			// setup logging
+			logLevel := pterm.LogLevelWarn
+			if debugFlag {
+				logLevel = pterm.LogLevelDebug
+			}
+
 			handler := pterm.NewSlogHandler(&pterm.Logger{
 				Formatter: pterm.LogFormatterColorful,
 				Writer:    os.Stdout,
-				Level:     pterm.LogLevelWarn,
+				Level:     logLevel,
 				ShowTime:  false,
 				MaxWidth:  280,
 				KeyStyles: map[string]pterm.Style{
@@ -110,11 +117,39 @@ func GetBundleCommand() *cobra.Command {
 				},
 			})
 			logger := slog.New(handler)
+
 			docConfig := &datamodel.DocumentConfiguration{
-				BasePath:                baseFlag,
 				ExtractRefsSequentially: true,
 				Logger:                  logger,
-				AllowRemoteReferences:   remoteFlag,
+			}
+
+			isRemoteFile := strings.HasPrefix(args[0], "http")
+
+			if isRemoteFile {
+				baseURL, err := url.Parse(args[0])
+				if err != nil {
+					return fmt.Errorf("parse input file URL: %v", err)
+				}
+				dir, _ := path.Split(baseURL.Path)
+				baseURL.Path = dir
+				baseURL.RawQuery = ""
+
+				docConfig.BaseURL = baseURL
+				docConfig.AllowFileReferences = false
+				docConfig.AllowRemoteReferences = true
+				docConfig.BasePath = ""
+			} else {
+				docConfig.BaseURL = nil
+				docConfig.BasePath = "."
+				if baseFlag != "" {
+					docConfig.BasePath = baseFlag
+				}
+				docConfig.AllowFileReferences = true
+				docConfig.AllowRemoteReferences = remoteFlag
+			}
+
+			if authHeaderFlag != "" {
+				docConfig.RemoteURLHandler = remote.NewAuthenticatedRemoteHandlerFunc(authHeaderFlag)
 			}
 
 			bundled, err := bundler.BundleBytes(specBytes, docConfig)

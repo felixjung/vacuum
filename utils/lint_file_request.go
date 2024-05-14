@@ -4,10 +4,11 @@
 package utils
 
 import (
-	"github.com/daveshanley/vacuum/model"
-	"github.com/daveshanley/vacuum/rulesets"
 	"log/slog"
 	"sync"
+
+	"github.com/daveshanley/vacuum/model"
+	"github.com/daveshanley/vacuum/rulesets"
 )
 
 type LintFileRequest struct {
@@ -15,6 +16,7 @@ type LintFileRequest struct {
 	BaseFlag                 string
 	MultiFile                bool
 	Remote                   bool
+	AuthorizationHeader      string
 	SkipCheckFlag            bool
 	Silent                   bool
 	DetailsFlag              bool

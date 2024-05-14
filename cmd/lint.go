@@ -53,6 +53,7 @@ func GetLintCommand() *cobra.Command {
 			baseFlag, _ := cmd.Flags().GetString("base")
 			skipCheckFlag, _ := cmd.Flags().GetBool("skip-check")
 			remoteFlag, _ := cmd.Flags().GetBool("remote")
+			authHeaderFlag, _ := cmd.Flags().GetString("auth-header")
 			debugFlag, _ := cmd.Flags().GetBool("debug")
 			noBanner, _ := cmd.Flags().GetBool("no-banner")
 			noMessage, _ := cmd.Flags().GetBool("no-message")
@@ -193,6 +194,7 @@ func GetLintCommand() *cobra.Command {
 						FileName:                 fileName,
 						BaseFlag:                 baseFlag,
 						Remote:                   remoteFlag,
+						AuthorizationHeader:      authHeaderFlag,
 						MultiFile:                mf,
 						SkipCheckFlag:            skipCheckFlag,
 						Silent:                   silent,
@@ -312,6 +314,7 @@ func lintFile(req utils.LintFileRequest) (int64, int, error) {
 		SpecFileName:                 req.FileName,
 		CustomFunctions:              req.Functions,
 		Base:                         req.BaseFlag,
+		AuthorizationHeader:          req.AuthorizationHeader,
 		AllowLookup:                  req.Remote,
 		SkipDocumentCheck:            req.SkipCheckFlag,
 		Logger:                       req.Logger,

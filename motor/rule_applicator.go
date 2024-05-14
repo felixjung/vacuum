@@ -7,9 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	vacuumUtils "github.com/daveshanley/vacuum/utils"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/sourcegraph/conc"
 	"io"
 	"log/slog"
 	"net/url"
@@ -18,6 +15,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/daveshanley/vacuum/remote"
+	vacuumUtils "github.com/daveshanley/vacuum/utils"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/sourcegraph/conc"
 
 	"github.com/daveshanley/vacuum/functions"
 	"github.com/daveshanley/vacuum/model"
@@ -53,20 +55,21 @@ type ruleContext struct {
 // RuleSetExecution is an instruction set for executing a ruleset. It's a convenience structure to allow the signature
 // of ApplyRulesToRuleSet to change, without a huge refactor. The ApplyRulesToRuleSet function only returns a single error also.
 type RuleSetExecution struct {
-	RuleSet           *rulesets.RuleSet             // The RuleSet in which to apply
-	SpecFileName      string                        // The name of the specification file, used to correctly label location
-	Spec              []byte                        // The raw bytes of the OpenAPI specification.
-	SpecInfo          *datamodel.SpecInfo           // Pre-parsed spec-info.
-	CustomFunctions   map[string]model.RuleFunction // custom functions loaded from plugin.
-	PanicFunction     func(p any)                   // In case of emergency, do this thing here.
-	SilenceLogs       bool                          // Prevent any warnings about rules/rule-sets being printed.
-	Base              string                        // The base path or URL of the specification, used for resolving relative or remote paths.
-	AllowLookup       bool                          // Allow remote lookup of files or links
-	Document          libopenapi.Document           // a ready to render model.
-	DrDocument        *doctor.DrDocument            // a high level, more powerful model, powered by the doctor.
-	SkipDocumentCheck bool                          // Skip the document check, useful for fragments and non openapi specs.
-	Logger            *slog.Logger                  // A custom logger.
-	Timeout           time.Duration                 // The timeout for each rule to run, prevents run-away rules, default is five seconds.
+	RuleSet             *rulesets.RuleSet             // The RuleSet in which to apply
+	SpecFileName        string                        // The name of the specification file, used to correctly label location
+	Spec                []byte                        // The raw bytes of the OpenAPI specification.
+	SpecInfo            *datamodel.SpecInfo           // Pre-parsed spec-info.
+	CustomFunctions     map[string]model.RuleFunction // custom functions loaded from plugin.
+	PanicFunction       func(p any)                   // In case of emergency, do this thing here.
+	SilenceLogs         bool                          // Prevent any warnings about rules/rule-sets being printed.
+	Base                string                        // The base path or URL of the specification, used for resolving relative or remote paths.
+	AllowLookup         bool                          // Allow remote lookup of files or links
+	AuthorizationHeader string                        // Set Authorization header for remote lookups
+	Document            libopenapi.Document           // a ready to render model.
+	DrDocument          *doctor.DrDocument            // a high level, more powerful model, powered by the doctor.
+	SkipDocumentCheck   bool                          // Skip the document check, useful for fragments and non openapi specs.
+	Logger              *slog.Logger                  // A custom logger.
+	Timeout             time.Duration                 // The timeout for each rule to run, prevents run-away rules, default is five seconds.
 
 	// https://pb33f.io/libopenapi/circular-references/#circular-reference-results
 	IgnoreCircularArrayRef       bool // Ignore array circular references
@@ -197,6 +200,11 @@ func ApplyRulesToRuleSet(execution *RuleSetExecution) *RuleSetExecutionResult {
 		indexConfigUnresolved.AllowRemoteLookup = true
 		docConfig.AllowRemoteReferences = true
 		docConfig.AllowFileReferences = true
+	}
+
+	if execution.AuthorizationHeader != "" {
+		indexConfig.RemoteURLHandler = remote.NewAuthenticatedRemoteHandlerFunc(execution.AuthorizationHeader)
+		docConfig.RemoteURLHandler = remote.NewAuthenticatedRemoteHandlerFunc(execution.AuthorizationHeader)
 	}
 
 	if execution.SkipDocumentCheck {

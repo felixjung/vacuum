@@ -154,13 +154,15 @@ func GetVacuumReportCommand() *cobra.Command {
 			}
 
 			ruleset := motor.ApplyRulesToRuleSet(&motor.RuleSetExecution{
-				RuleSet:           selectedRS,
-				Spec:              specBytes,
-				CustomFunctions:   customFunctions,
-				SilenceLogs:       true,
-				Base:              baseFlag,
-				SkipDocumentCheck: skipCheckFlag,
-				Timeout:           time.Duration(timeoutFlag) * time.Second,
+				// TODO: add config values for remote lookup and authorization header
+				RuleSet:             selectedRS,
+				Spec:                specBytes,
+				CustomFunctions:     customFunctions,
+				SilenceLogs:         true,
+				Base:                baseFlag,
+				AuthorizationHeader: authHeaderFlag,
+				SkipDocumentCheck:   skipCheckFlag,
+				Timeout:             time.Duration(timeoutFlag) * time.Second,
 			})
 
 			resultSet := model.NewRuleResultSet(ruleset.Results)
@@ -251,8 +253,7 @@ func GetVacuumReportCommand() *cobra.Command {
 			pterm.Success.Printf("Report generated for '%s', written to '%s'\n", args[0], reportOutputName)
 			pterm.Println()
 
-			fi, _ := os.Stat(args[0])
-			RenderTime(timeFlag, duration, fi.Size())
+			RenderTime(timeFlag, duration, int64(len(specBytes)))
 
 			return nil
 		},
